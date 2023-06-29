@@ -1,0 +1,14 @@
+Notes for Day1:
+
+Problem 1:
+
+b) This model can describe the spike in the acute phase and the equilibrium of the chronic phase. Simulation of the AIDS phase of a HIV would 
+not be possible with this model.
+
+c)Dt > 0.1 is timestep to big: simulation happens much faster handle to big timesteps with 1000 steps. When time steps are too small then the change in both 
+groups gives higher resolution. Dt determines the speed of environmental change.
+
+d)In case of high production and clearance are equal, the models beta stays constant. The new model considers reproductive  succes and its resistance 
+to immune responses of the cell.
+
+    

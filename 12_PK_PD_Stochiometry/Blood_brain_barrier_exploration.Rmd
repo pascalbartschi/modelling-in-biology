@@ -1,0 +1,235 @@
+---
+title: "PD_exploration"
+author: "Pascal"
+date: "2022-12-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem 2
+
+### a) paramters for KD adb receotir occupancy RO
+
+```{r}
+setwd("~/BSc_UZH/UZH_22HS/BIO445_BK/12_PK_PD_Stochiometry")
+
+E <- function(conc, E0, Emax, EC50, gamma) {
+  
+  tot_eff <- E0 + ((Emax * conc ** gamma) / (EC50 ** gamma + conc ** gamma))
+    
+  return(tot_eff)
+}
+```
+
+### b) minimum efficacy and potency
+
+```{r}
+Emax <- 90 # maximum treatment effect
+E0 <- 10 # baseline effect
+EC50 <- 0.3 # 50 % of drug effect
+# Hill coefficient
+gammaA <- 1
+gammaB <- 4
+gammaC <- 0.25
+conc <- seq(0, 1.5, by = 0.015)
+
+drug_A <- E(conc, E0, Emax, EC50, gammaA) # possible to directly plug in without for loop
+drug_B <- E(conc, E0, Emax, EC50, gammaB)
+drug_C <- E(conc, E0, Emax, EC50, gammaC)
+
+drug_frame <- data.frame(values = c(drug_A, drug_B, drug_C),
+                         conc = rep(conc, 3),
+                         drug = c(rep("drug_A", length(drug_A)), 
+                                  rep("drug_B", length(drug_B)),
+                                  rep("drug_C", length(drug_C))))
+```
+
+#### ggplot
+
+```{r}
+library(ggplot2)
+library(ggforce)
+library(tidyverse)
+           
+p <- ggplot(data = drug_frame, mapping = aes(x = conc, y = values, color = drug)) + 
+  geom_line() + 
+  geom_vline(xintercept = EC50, linetype = "dashed") + 
+  labs(x = "concentration", y = "effect size", title = "Sigmoid curves of different drugs") + 
+  theme_bw()
+
+# required: minimum therapeutic effect, c > too toxic
+
+min_ther <- 20 # min therapeutic effect
+max_c <- 0.25 # max concentration that can be taken
+
+p + ggforce::facet_zoom(xlim = c(0, max_c), ylim = c(min_ther, 100)) +
+  labs(title = "Drug C is best for (i)")
+
+ggsave("2_b_i_drug_C.png", height = 10, width = 20, units = "cm")
+
+ther_window <- c(0.45, 1.2) # wished therapeutic conc
+
+p + ggforce::facet_zoom(xlim = ther_window, ylim = c(min_ther, 100)) + 
+  labs(title = "Drug B is best for (ii)")
+
+ggsave("2_b_i_drug_B.png", height = 10, width = 20, units = "cm")
+
+```
+
+# Problem 2: direct response and biophase distribution models
+
+### a) PK model
+
+```{r}
+source("PD_scripts.r")
+
+some_frame <- as.data.frame(conc_Blood_Brain())
+exploratory_frame <- pivot_longer(data = some_frame,
+                                  cols = c(Blood, Brain),
+                                  names_to = "Type",
+                                  values_to = "C")
+
+ggplot(data = exploratory_frame, 
+       mapping = aes(x = Time, y = C, color = Type)) + 
+  geom_line() + 
+  geom_vline(xintercept = 75, linetype = "dashed")
+  labs(x = "Time [min]", y = "Concentration", 
+       title = "Drug concetration and blood brain barrier") + 
+  theme_bw()
+  
+ggsave("3_Exploratory_concBloodBrain_standard_params.png", 
+       height = 10, width = 20, units = "cm")
+
+# for quick exploration
+plot(conc_Blood_Brain())
+```
+
+### b) direct response model
+
+```{r}
+
+E0 <- 0
+Emax <- 100
+EC50 <- 1
+gamma <- 2
+
+
+out <- conc_Blood_Brain()
+
+effect_brain <- E(out_frame[,"Brain"],E0, Emax, EC50, gamma)
+
+# determines highest effect
+max_EGG <- which.max(effect_brain)
+
+ggplot(mapping = aes(x = out[,"Time"], y = effect_brain)) + 
+  geom_vline(xintercept = conc_brain[max_EGG], color = "red") +
+  geom_line() + 
+  labs(x = "Time [min]", y = "EEG", title = "Effect vs Time") +
+  theme_bw()
+
+# mask_1.5 <- out[,"Brain"] < 1.5
+
+ggplot(mapping = aes(x = out[, "Brain"], y = effect_brain)) + 
+  geom_vline(xintercept = conc_brain[max_EGG], color = "red") +
+  geom_line() +
+  xlim(0, 1.5) +
+  labs(x = "c(Drug)", y = "EEG", title = "Effect vs Concentration") +
+  theme_bw()
+
+# max in EEG in red
+
+
+```
+
+
+### c) biophase distrubution model
+
+Predict effects on brain by measuring effects in blood, because it is much less invasive.
+
+```{r}
+
+E0 <- 0
+Emax <- 100
+EC50 <- 1
+gamma <- 2
+
+
+out <- conc_Blood_Brain()
+
+effect_brain <- E(out_frame[,"Blood"],E0, Emax, EC50, gamma)
+
+ggplot(mapping = aes(x = out[,"Time"], y = effect_brain)) + 
+  geom_vline(xintercept = conc_brain[max_EGG], color = "red") +
+  geom_line() + 
+  labs(x = "Time [min]", y = "EEG", title = "Effect vs Time") +
+  theme_bw()
+
+ggplot(mapping = aes(x = out[,"Blood"], y = effect_brain)) + 
+  geom_vline(xintercept = conc_brain[max_EGG], color = "red") +
+  geom_line() + 
+  labs(x = "Concentration", y = "EEG", title = "Effect Brain vs Concentration Blood") +
+  xlim(0, 3) +
+  theme_bw()
+
+
+
+```
+
+### our slide: comparing the direct and biophase distribution model
+
+```{r}
+E0 <- 0
+Emax <- 100
+EC50 <- 0.3
+gamma <- 2
+
+
+out <- conc_Blood_Brain()
+
+effect_brain <- E(out[,"Brain"],E0, Emax, EC50, gamma)
+
+# determines highest effect
+max_EGG <- which.max(effect_brain)
+
+len <- length(out[, "Blood"])
+
+df <- data.frame(effect = rep(effect_brain,2), 
+                 conc = c(out[, "Brain"], out[,"Blood"]),
+                 Model = c(rep("Direct", len), rep("Biophase", len)), 
+                 Time = rep(out[,"Time"], 2))
+
+
+p1 <- ggplot(data = df, mapping = aes(x = conc, y = effect)) +
+  geom_line(aes(linetype = Model), linewidth = 1, alpha = 0.5) +
+  geom_point(aes(color = Time)) +
+  labs(x = "Drug concentration", 
+       y = "EGG (effect)", 
+       title = "Effect in brain vs. drug concentration", 
+       subtitle = "Biophase distribution model displays accurate approximation of effect in brain") +
+  theme_bw()
+
+some_frame <- as.data.frame(out)
+exploratory_frame <- pivot_longer(data = some_frame,
+                                  cols = c(Blood, Brain),
+                                  names_to = "Type",
+                                  values_to = "C")
+
+p2 <- ggplot(data = exploratory_frame, 
+       mapping = aes(x = Time, y = C, color = Type)) + 
+  geom_line() + 
+  geom_vline(xintercept = c(17, 75), linetype = "dashed", alpha = 0.5) +
+  labs(x = "Time [min]", y = "Drug concentration", 
+       title = "Drug overcoming blood brain barrier", 
+       subtitle = "Both tissues show similar concentration trajectories after equilibrium is reached.") + 
+  theme_bw()
+
+
+library(ggpubr)
+ggarrange(p2, p1, ncol = 2, nrow = 1)
+
+ggsave("Blood_brain_barrier_model.png", height = 10, width = 30, units = "cm")
+
+```

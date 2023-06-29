@@ -1,0 +1,2 @@
+Negative Binomial ditribution accounts for overdispersal or/and outliers better than poission or other commercially used
+
